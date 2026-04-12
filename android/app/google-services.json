@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "208488933623",
+    "project_id": "gatment-f2b4e",
+    "storage_bucket": "gatment-f2b4e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:208488933623:android:f3ffdb1b30d51bacaa4bf2",
+        "android_client_info": {
+          "package_name": "com.siddhivinayakgarments.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "208488933623-h70l8vhkp02k1on4tealp5pp9mptsohq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAnLTxsxkuE8X2EqUuSwz7fUV6JwDgKtRk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "208488933623-h70l8vhkp02k1on4tealp5pp9mptsohq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
