@@ -1,69 +1,51 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/worker_model.dart';
 import '../models/lot_model.dart';
 import '../models/production_record.dart';
 import '../utils/constants.dart';
 
-/// Centralized service for all Firestore CRUD operations.
-///
-/// Provides real-time streams for workers, lots, and production records,
-/// plus aggregated dashboard statistics.
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // ═══════════════════════════════════════════════════════════
-  //  WORKERS
-  // ═══════════════════════════════════════════════════════════
+  // ✅ USER BASED COLLECTION
+  CollectionReference<Map<String, dynamic>> _collection(String name) {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw Exception("User not logged in");
+    }
+    return _db.collection('users').doc(uid).collection(name);
+  }
 
-  /// Real-time stream of all workers, ordered by creation date (newest first).
+  // ================= WORKERS =================
+
   Stream<List<WorkerModel>> getWorkers() {
-    return _db
-        .collection(AppConstants.workersCollection)
-        .orderBy('createdAt', descending: true)
+    return _collection(AppConstants.workersCollection)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => WorkerModel.fromMap(doc.id, doc.data()))
             .toList());
   }
 
-  /// Get a single worker by ID.
-  Future<WorkerModel?> getWorkerById(String id) async {
-    final doc =
-        await _db.collection(AppConstants.workersCollection).doc(id).get();
-    if (doc.exists && doc.data() != null) {
-      return WorkerModel.fromMap(doc.id, doc.data()!);
-    }
-    return null;
-  }
-
-  /// Add a new worker to Firestore.
   Future<void> addWorker(WorkerModel worker) async {
-    await _db
-        .collection(AppConstants.workersCollection)
-        .add(worker.toMap());
+    await _collection(AppConstants.workersCollection).add(worker.toMap());
   }
 
-  /// Update an existing worker.
   Future<void> updateWorker(WorkerModel worker) async {
-    await _db
-        .collection(AppConstants.workersCollection)
+    await _collection(AppConstants.workersCollection)
         .doc(worker.id)
         .update(worker.toMap());
   }
 
-  /// Delete a worker by ID.
   Future<void> deleteWorker(String id) async {
-    await _db.collection(AppConstants.workersCollection).doc(id).delete();
+    await _collection(AppConstants.workersCollection).doc(id).delete();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  LOTS
-  // ═══════════════════════════════════════════════════════════
+  // ================= LOTS =================
 
-  /// Real-time stream of all lots, ordered by date (newest first).
   Stream<List<LotModel>> getLots() {
-    return _db
-        .collection(AppConstants.lotsCollection)
+    return _collection(AppConstants.lotsCollection)
         .orderBy('date', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
@@ -71,57 +53,62 @@ class FirestoreService {
             .toList());
   }
 
-  /// Add a new lot entry.
   Future<void> addLot(LotModel lot) async {
-    await _db.collection(AppConstants.lotsCollection).add(lot.toMap());
+    await _collection(AppConstants.lotsCollection).add(lot.toMap());
   }
 
-  /// Update an existing lot.
   Future<void> updateLot(LotModel lot) async {
-    await _db
-        .collection(AppConstants.lotsCollection)
+    await _collection(AppConstants.lotsCollection)
         .doc(lot.id)
         .update(lot.toMap());
   }
 
-  /// Delete a lot by ID.
   Future<void> deleteLot(String id) async {
-    await _db.collection(AppConstants.lotsCollection).doc(id).delete();
+    await _collection(AppConstants.lotsCollection).doc(id).delete();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  PRODUCTION RECORDS
-  // ═══════════════════════════════════════════════════════════
+  // ================= PRODUCTION =================
 
-  /// Add a new production record.
   Future<void> addProductionRecord(ProductionRecord record) async {
-    await _db
-        .collection(AppConstants.productionCollection)
-        .add(record.toMap());
+    final batch = _db.batch();
+
+    final prodRef = _collection(AppConstants.productionCollection).doc();
+    batch.set(prodRef, record.toMap());
+
+    final workerRef =
+        _collection(AppConstants.workersCollection).doc(record.workerId);
+
+    batch.update(workerRef, {
+      'totalPieces': FieldValue.increment(record.pieces),
+      'piecesToday': FieldValue.increment(record.pieces),
+    });
+
+    await batch.commit();
   }
 
-  /// Get production records for a specific date.
   Stream<List<ProductionRecord>> getProductionByDate(DateTime date) {
-    final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+    if (_auth.currentUser == null) return Stream.value([]);
 
-    return _db
-        .collection(AppConstants.productionCollection)
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-        .where('date', isLessThan: Timestamp.fromDate(endOfDay))
+    final start = DateTime(date.year, date.month, date.day);
+    final end = start.add(const Duration(days: 1));
+
+    return _collection(AppConstants.productionCollection)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThan: Timestamp.fromDate(end))
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => ProductionRecord.fromMap(doc.id, doc.data()))
             .toList());
   }
 
-  /// Get production records for the last N days.
+  // ✅ FIXED METHOD 1
   Future<List<ProductionRecord>> getProductionLastDays(int days) async {
+    if (_auth.currentUser == null) return [];
+
     final startDate = DateTime.now().subtract(Duration(days: days));
-    final snapshot = await _db
-        .collection(AppConstants.productionCollection)
-        .where('date',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+
+    final snapshot = await _collection(AppConstants.productionCollection)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
         .orderBy('date', descending: false)
         .get();
 
@@ -130,52 +117,45 @@ class FirestoreService {
         .toList();
   }
 
-  /// Get production records for a specific worker.
-  Future<List<ProductionRecord>> getProductionByWorker(String workerId) async {
-    final snapshot = await _db
-        .collection(AppConstants.productionCollection)
-        .where('workerId', isEqualTo: workerId)
-        .orderBy('date', descending: true)
-        .get();
-
-    return snapshot.docs
-        .map((doc) => ProductionRecord.fromMap(doc.id, doc.data()))
-        .toList();
-  }
-
-  /// Get total production for a given month.
+  // ✅ FIXED METHOD 2
   Future<int> getMonthlyProduction(int year, int month) async {
-    final startOfMonth = DateTime(year, month, 1);
-    final endOfMonth = DateTime(year, month + 1, 1);
+    if (_auth.currentUser == null) return 0;
 
-    final snapshot = await _db
-        .collection(AppConstants.productionCollection)
-        .where('date',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-        .where('date', isLessThan: Timestamp.fromDate(endOfMonth))
+    final start = DateTime(year, month, 1);
+    final end = DateTime(year, month + 1, 1);
+
+    final snapshot = await _collection(AppConstants.productionCollection)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThan: Timestamp.fromDate(end))
         .get();
 
     int total = 0;
+
     for (var doc in snapshot.docs) {
       total += (doc.data()['pieces'] as int?) ?? 0;
     }
+
     return total;
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  DASHBOARD STATISTICS
-  // ═══════════════════════════════════════════════════════════
+  // ================= DASHBOARD =================
 
-  /// Get aggregated dashboard stats.
-  ///
-  /// Returns a map with keys: totalWorkers, totalHelpers, todayProduction,
-  /// stockBalance.
   Future<Map<String, dynamic>> getDashboardStats() async {
-    // Count workers and helpers
+    if (_auth.currentUser == null) {
+      return {
+        'totalWorkers': 0,
+        'totalHelpers': 0,
+        'todayProduction': 0,
+        'stockBalance': 0,
+      };
+    }
+
     final workersSnapshot =
-        await _db.collection(AppConstants.workersCollection).get();
+        await _collection(AppConstants.workersCollection).get();
+
     int totalWorkers = 0;
     int totalHelpers = 0;
+
     for (var doc in workersSnapshot.docs) {
       final role = doc.data()['role'] ?? 'Worker';
       if (role == 'Helper') {
@@ -185,28 +165,28 @@ class FirestoreService {
       }
     }
 
-    // Today's production
     final today = DateTime.now();
-    final startOfDay = DateTime(today.year, today.month, today.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final start = DateTime(today.year, today.month, today.day);
+    final end = start.add(const Duration(days: 1));
 
-    final productionSnapshot = await _db
-        .collection(AppConstants.productionCollection)
-        .where('date',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-        .where('date', isLessThan: Timestamp.fromDate(endOfDay))
-        .get();
+    final productionSnapshot =
+        await _collection(AppConstants.productionCollection)
+            .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+            .where('date', isLessThan: Timestamp.fromDate(end))
+            .get();
 
     int todayProduction = 0;
+
     for (var doc in productionSnapshot.docs) {
       todayProduction += (doc.data()['pieces'] as int?) ?? 0;
     }
 
-    // Stock balance (total pieces in - total pieces out across all lots)
     final lotsSnapshot =
-        await _db.collection(AppConstants.lotsCollection).get();
+        await _collection(AppConstants.lotsCollection).get();
+
     int totalIn = 0;
     int totalOut = 0;
+
     for (var doc in lotsSnapshot.docs) {
       totalIn += (doc.data()['piecesIn'] as int?) ?? 0;
       totalOut += (doc.data()['piecesOut'] as int?) ?? 0;
@@ -218,5 +198,56 @@ class FirestoreService {
       'todayProduction': todayProduction,
       'stockBalance': totalIn - totalOut,
     };
+  }
+
+  // ================= PROFILE =================
+
+  /// Get user profile data
+  Future<Map<String, dynamic>?> getUserProfile() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return null;
+
+    final doc = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('profile')
+        .doc('info')
+        .get();
+    
+    if (doc.exists) {
+      return doc.data();
+    } else {
+      // Create default profile if it doesn't exist
+      final defaultProfile = {
+        'name': _auth.currentUser?.displayName ?? 'User',
+        'email': _auth.currentUser?.email ?? '',
+        'phone': _auth.currentUser?.phoneNumber ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+      await _db
+          .collection('users')
+          .doc(uid)
+          .collection('profile')
+          .doc('info')
+          .set(defaultProfile);
+      return defaultProfile;
+    }
+  }
+
+  /// Update user profile data
+  Future<void> updateUserProfile(String name, String phone) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception("User not logged in");
+
+    await _db
+        .collection('users')
+        .doc(uid)
+        .collection('profile')
+        .doc('info')
+        .update({
+      'name': name,
+      'phone': phone,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 }

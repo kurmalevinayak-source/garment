@@ -1,103 +1,75 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
-/// Manages Firebase Authentication state.
-///
-/// Uses [ChangeNotifier] so it can be used with Provider for
-/// reactive UI updates when auth state changes.
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // ─── Current user ─────────────────────────────────────────
+  // ─── Current user ─────────────────────────
   User? get currentUser => _auth.currentUser;
   bool get isLoggedIn => _auth.currentUser != null;
 
-  // ─── Auth state stream ────────────────────────────────────
-  /// Stream that emits on every sign-in / sign-out event.
+  // ─── Auth state stream ────────────────────
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  // ─── Sign In ──────────────────────────────────────────────
-  /// Signs in with email and password.
-  /// Returns null on success, or an error message string on failure.
+  // ─── LOGIN ───────────────────────────────
   Future<String?> signIn(String email, String password) async {
     try {
-      // 1. Ensure Firebase is fully initialized before proceeding
-      if (Firebase.apps.isEmpty) {
-        return 'System Error: Firebase is not initialized. Please restart the app.';
-      }
-
-      // 2. Properly await the Firebase auth method
       await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password.trim(),
       );
-      
-      notifyListeners();
-      return null; // success
-      
-    } on FirebaseAuthException catch (e) {
-      // 3. Handle specific Firebase error codes
-      return _mapAuthError(e.code);
-    } catch (e) {
-      return 'An unexpected error occurred: ${e.toString()}';
-    }
-  }
 
-  // ─── Sign Out ─────────────────────────────────────────────
-  /// Signs out the current user.
-  Future<void> signOut() async {
-    await _auth.signOut();
-    notifyListeners();
-  }
-
-  // ─── Register (optional — for creating the first admin) ───
-  /// Creates a new user account with email and password.
-  /// Returns null on success, or an error message string on failure.
-  Future<String?> register(String email, String password) async {
-    try {
-      if (Firebase.apps.isEmpty) {
-        return 'System Error: Firebase is not initialized.';
-      }
-      
-      await _auth.createUserWithEmailAndPassword(
-        email: email.trim(),
-        password: password.trim(),
-      );
-      
       notifyListeners();
       return null;
     } on FirebaseAuthException catch (e) {
       return _mapAuthError(e.code);
     } catch (e) {
-      return 'An unexpected error occurred: ${e.toString()}';
+      return "Something went wrong. Try again.";
     }
   }
 
-  // ─── Error message mapping ────────────────────────────────
-  /// Maps Firebase error codes to user-friendly messages.
+  // ─── SIGNUP (IMPORTANT 🔥) ────────────────
+  Future<String?> signUp(String email, String password) async {
+    try {
+      await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password.trim(),
+      );
+
+      notifyListeners();
+      return null;
+    } on FirebaseAuthException catch (e) {
+      return _mapAuthError(e.code);
+    } catch (e) {
+      return "Something went wrong. Try again.";
+    }
+  }
+
+  // ─── LOGOUT ──────────────────────────────
+  Future<void> signOut() async {
+    await _auth.signOut();
+    notifyListeners();
+  }
+
+  // ─── ERROR HANDLING ──────────────────────
   String _mapAuthError(String code) {
     switch (code) {
       case 'user-not-found':
         return 'No account found with this email.';
       case 'wrong-password':
-        return 'Incorrect password. Please try again.';
+        return 'Incorrect password.';
       case 'invalid-email':
-        return 'Please enter a valid email address.';
-      case 'user-disabled':
-        return 'This account has been disabled.';
+        return 'Invalid email address.';
       case 'email-already-in-use':
-        return 'An account already exists with this email.';
+        return 'Email already registered.';
       case 'weak-password':
-        return 'Password is too weak. Use at least 6 characters.';
-      case 'too-many-requests':
-        return 'Too many attempts. Please try again later.';
+        return 'Password must be at least 6 characters.';
+      case 'network-request-failed':
+        return 'Check your internet connection.';
       case 'invalid-credential':
         return 'Invalid email or password.';
-      case 'network-request-failed':
-        return 'Network error. Please check your internet connection.';
       default:
-        return 'Authentication failed. Error code: $code';
+        return 'Authentication failed. ($code)';
     }
   }
 }

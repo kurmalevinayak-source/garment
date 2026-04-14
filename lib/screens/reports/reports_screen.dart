@@ -653,7 +653,7 @@ class _ReportsScreenState extends State<ReportsScreen>
       decoration: BoxDecoration(
         color: rank <= 3
             ? AppColors.accent.withAlpha(20)
-            : Colors.grey.shade50,
+            : Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         border: rank <= 3
             ? Border.all(color: AppColors.accent.withAlpha(77))
@@ -667,13 +667,13 @@ class _ReportsScreenState extends State<ReportsScreen>
             height: 28,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: rank <= 3 ? AppColors.accent : Colors.grey.shade300,
+              color: rank <= 3 ? AppColors.accent : Theme.of(context).colorScheme.surfaceContainerHighest,
               shape: BoxShape.circle,
             ),
             child: Text(
               '$rank',
               style: TextStyle(
-                color: rank <= 3 ? AppColors.textPrimary : Colors.white,
+                color: rank <= 3 ? AppColors.textPrimary : Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),

@@ -78,14 +78,15 @@ class WorkerCard extends StatelessWidget {
                       const SizedBox(height: 8),
 
                       // Stats row
-                      Row(
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 4,
                         children: [
                           _buildStat(
                             Icons.today_rounded,
                             '${worker.piecesToday} pcs today',
                             context,
                           ),
-                          const SizedBox(width: 16),
                           _buildStat(
                             Icons.inventory_2_outlined,
                             '${worker.totalPieces} total',
@@ -97,25 +98,34 @@ class WorkerCard extends StatelessWidget {
                   ),
                 ),
 
+                const SizedBox(width: 12),
+
                 // Salary column
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${AppConstants.currencySymbol}${worker.salary.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.success,
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${AppConstants.currencySymbol}${worker.salary.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.success,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    Text(
-                      'salary',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontSize: 11,
-                          ),
-                    ),
-                  ],
+                      Text(
+                        'salary',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontSize: 11,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -152,11 +162,15 @@ class WorkerCard extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: AppColors.textSecondary),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontSize: 12,
-              ),
+        Flexible(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 12,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );

@@ -10,15 +10,9 @@ import 'login_screen.dart';
 import 'workers/workers_list_screen.dart';
 import 'lots/lots_list_screen.dart';
 import 'reports/reports_screen.dart';
+import 'production/add_production_screen.dart';
+import 'profile/profile_screen.dart'; // ✅ ADD THIS
 
-/// Main dashboard screen displayed after login.
-///
-/// Shows summary cards with real-time stats from Firestore:
-/// - Total Workers (workers + helpers)
-/// - Today's Production (pieces)
-/// - Stock Balance (remaining pieces)
-///
-/// Provides navigation to Workers, Lots, and Reports screens.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -28,6 +22,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final FirestoreService _firestoreService = FirestoreService();
+
   Map<String, dynamic>? _stats;
   bool _isLoading = true;
 
@@ -37,11 +32,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadStats();
   }
 
-  /// Fetch dashboard stats from Firestore
   Future<void> _loadStats() async {
     setState(() => _isLoading = true);
     try {
-      final stats = await _firestoreService.getDashboardStats();
+      final stats = await _firestoreService.getDashboardStats(); // ✅ FIXED
       if (mounted) {
         setState(() {
           _stats = stats;
@@ -55,7 +49,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  /// Handle sign out
   Future<void> _handleLogout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -78,12 +71,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (confirmed == true && mounted) {
       await Provider.of<AuthService>(context, listen: false).signOut();
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        );
-      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
     }
   }
 
@@ -101,12 +92,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Refresh',
             onPressed: _loadStats,
           ),
           IconButton(
+            icon: const Icon(Icons.person_outline),
+            tooltip: 'Profile',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Sign Out',
             onPressed: _handleLogout,
           ),
         ],
@@ -122,11 +119,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Greeting
                     Text(
                       'Dashboard',
-                      style:
-                          Theme.of(context).textTheme.headlineMedium,
+                      style: Theme.of(context).textTheme.headlineMedium,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -135,8 +130,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // ── Summary Cards ─────────────────────────
-                    // Row 1: Workers + Production
                     Row(
                       children: [
                         Expanded(
@@ -165,7 +158,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Row 2: Stock Balance (full width)
                     SummaryCard(
                       title: 'Stock Balance',
                       value: '$stockBalance',
@@ -177,12 +169,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                     const SizedBox(height: 32),
 
-                    // ── Navigation Menu ───────────────────────
                     Text(
                       'Quick Access',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 16),
+
+                    _buildNavItem(
+                      context,
+                      icon: Icons.add_circle_outline_rounded,
+                      title: 'Add Production',
+                      subtitle: 'Record daily pieces for workers',
+                      color: AppColors.primary,
+                      onTap: () async {
+                        final added = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AddProductionScreen()),
+                        );
+                        if (added == true) {
+                          _loadStats();
+                        }
+                      },
+                    ),
 
                     _buildNavItem(
                       context,
@@ -231,7 +240,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Navigation list item widget
   Widget _buildNavItem(
     BuildContext context, {
     required IconData icon,
@@ -254,19 +262,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           child: Icon(icon, color: color, size: 28),
         ),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        subtitle: Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        trailing: Icon(
-          Icons.arrow_forward_ios_rounded,
-          size: 16,
-          color: AppColors.textSecondary,
-        ),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
       ),
     );
   }
