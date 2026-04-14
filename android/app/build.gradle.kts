@@ -1,16 +1,24 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    // Google Services plugin for Firebase
     id("com.google.gms.google-services")
+}
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
 android {
     namespace = "com.siddhivinayakgarments.app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+
+    // ✅ FIX: Use the highest NDK version required by plugins
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -18,26 +26,64 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = "17"
+    }
+
+    signingConfigs {
+        create("release") {
+            val keyFile = keystoreProperties["storeFile"] as String?
+            if (keyFile != null && file(keyFile).exists()) {
+                keyAlias = keystoreProperties["keyAlias"] as String?
+                keyPassword = keystoreProperties["keyPassword"] as String?
+                storeFile = file(keyFile)
+                storePassword = keystoreProperties["storePassword"] as String?
+            } else {
+                val debugConfig = signingConfigs.getByName("debug")
+                keyAlias = debugConfig.keyAlias
+                keyPassword = debugConfig.keyPassword
+                storeFile = debugConfig.storeFile
+                storePassword = debugConfig.storePassword
+            }
+        }
     }
 
     defaultConfig {
         applicationId = "com.siddhivinayakgarments.app"
-        // minSdk 23 is required by Firebase plugins
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // Enable multidex for Firebase
         multiDexEnabled = true
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+
+            // 🔥 FIX FOR BUILD ERROR
+            isMinifyEnabled = false
+            isShrinkResources = false
+
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
+    }
+
+    // 🔥 MAIN FIX (native lib error solve)
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            doNotStrip.add("**/*.so")
+        }
+    }
+}
+
+// 🔥 NUCLEAR FIX: Disable the failing strip command entirely
+tasks.configureEach {
+    if (name.contains("strip") && name.contains("DebugSymbols")) {
+        enabled = false
     }
 }
 
